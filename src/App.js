@@ -1,25 +1,292 @@
-import logo from './logo.svg';
 import './App.css';
+import {useEffect, useRef, useState} from "react";
+import {initializeApp} from "firebase/app";
+import {getAnalytics} from "firebase/analytics";
+import {getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword} from "firebase/auth";
+import {getFirestore} from "firebase/firestore";
+import {collection, addDoc} from "firebase/firestore";
+import {getDatabase, push, ref, onValue} from "firebase/database";
+
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+
+    const [loginEmail, setLoginEmail] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
+    const [registerEmail, setregisterEmail] = useState('');
+    const [registerPassword, setRegisterPassword] = useState('');
+    const [loggedIn, setLoggedIn] = useState(false);
+    const [user, setUser] = useState(null);
+    const [message, setMessage] = useState('');
+    const [messages, setMessages] = useState([]);
+    const messagesContainerRef = useRef(null);
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDur5UEXIl3r3CgavwvjglIbcXf_yWh2ys",
+        authDomain: "priprava-chatapp.firebaseapp.com",
+        databaseURL: "https://priprava-chatapp-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "priprava-chatapp",
+        storageBucket: "priprava-chatapp.appspot.com",
+        messagingSenderId: "331402954384",
+        appId: "1:331402954384:web:c567e45c65513c1c1d3a15",
+        measurementId: "G-0734019DP6"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+
+    // Initialize Firebase Authentication and get a reference to the service
+    const auth = getAuth(app);
+
+    // Initialize Cloud Firestore and get a reference to the service
+    const db = getFirestore(app);
+
+    // Initialize Realtime Database and get a reference to the service
+    const database = getDatabase(app);
+
+    const chatRef = ref(database, 'chat/');
+
+
+    // ======= firebase functions =======
+
+    const login = () => {
+        signInWithEmailAndPassword(auth, loginEmail, loginPassword)
+            .then((userCredential) => {
+                // Signed in
+                setUser(userCredential.user);
+                setLoggedIn(true);
+            })
+            .catch((error) => {
+                const errorCode = error.code;
+                const errorMessage = error.message;
+                console.log(errorCode, errorMessage);
+            });
+    }
+
+    const register = () => {
+        createUserWithEmailAndPassword(auth, registerEmail, registerPassword)
+            .then(async (userCredential) => {
+                // Signed in
+                setUser(userCredential.user);
+                await addUserDocument(userCredential.user.uid);
+                setLoggedIn(true);
+            })
+            .catch((error) => {
+                const errorCode = error.code;
+                const errorMessage = error.message;
+                console.log(errorCode, errorMessage);
+            });
+    }
+
+    const addUserDocument = async (uid) => {
+        try {
+            const docRef = await addDoc(collection(db, "users"), {
+                first: "Ada",
+                last: "Lovelace",
+                born: 1815
+            });
+            console.log("Document written with ID: ", docRef.id);
+        } catch (e) {
+            console.error("Error adding document: ", e);
+        }
+    }
+
+    const sendMessage = () => {
+        push(ref(database, 'chat/'), {
+            user: user.uid,
+            text: message,
+            timestamp: Date.now(),
+        });
+        setMessage('');
+    }
+
+    useEffect(() => {
+        if (chatRef) {
+            onValue(chatRef, (snapshot) => {
+                const messagesData = snapshot.val();
+
+                if (messagesData) {
+                    const messagesArray = Object.entries(messagesData).map(([id, data]) => ({
+                        id,
+                        ...data,
+                    }));
+                    setMessages(messagesArray);
+                }
+            });
+        }
+    }, [])
+
+    useEffect(() => {
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+    }, [messages])
+
+    // !! ======= firebase functions =======
+
+
+    const onChangeHandler = (event, set) => {
+        set(event.target.value);
+    }
+
+    // useEffect(()=>{
+    //     console.log("email", email);
+    //     console.log("password", password);
+    // },[email,password])
+
+    // useEffect(()=>{
+    //     console.log(user);
+    // },[user])
+
+    if (!loggedIn) {
+        return (
+            <section className="vh-100 gradient-custom">
+                <div className="container py-5 h-100">
+                    <div className="row d-flex justify-content-center align-items-center h-100">
+                        <div className="col-12 col-md-8 col-lg-6 col-xl-5">
+                            <div className="card bg-dark text-white">
+                                <div className="card-body p-5 text-center">
+
+                                    <div className="">
+
+                                        <h2 className="fw-bold mb-2 text-uppercase mb-3">Login</h2>
+                                        <div className="form-outline form-white mb-4 text-dark">
+                                            <div className="form-floating mb-3">
+                                                <input type="email"
+                                                       className="form-control"
+                                                       id="floatingInput"
+                                                       placeholder="name@example.com"
+                                                       onChange={(e) => {
+                                                           onChangeHandler(e, setLoginEmail)
+                                                       }}
+                                                       value={loginEmail}/>
+                                                <label htmlFor="floatingInput">Email address</label>
+                                            </div>
+                                            <div className="form-floating">
+                                                <input type="password"
+                                                       className="form-control"
+                                                       id="floatingPassword"
+                                                       placeholder="Password"
+                                                       onChange={(e) => {
+                                                           onChangeHandler(e, setLoginPassword)
+                                                       }}
+                                                       value={loginPassword}/>
+                                                <label htmlFor="floatingPassword">Password</label>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            className="btn btn-outline-light btn-lg px-5"
+                                            type="submit"
+                                            onClick={login}>
+                                            Login
+                                        </button>
+                                    </div>
+                                    <hr/>
+                                    <div className="mb-md-5 mt-md-4 pb-5">
+
+                                        <h2 className="fw-bold mb-2 text-uppercase mb-3">Register</h2>
+
+                                        <div className="form-outline form-white mb-4 text-dark">
+                                            <div className="form-floating mb-3">
+                                                <input type="email"
+                                                       className="form-control"
+                                                       id="registerEmail"
+                                                       placeholder="name@example.com"
+                                                       onChange={(e) => {
+                                                           onChangeHandler(e, setregisterEmail)
+                                                       }}
+                                                       value={registerEmail}/>
+                                                <label htmlFor="registerEmail">Email address</label>
+                                            </div>
+                                            <div className="form-floating">
+                                                <input type="password"
+                                                       className="form-control"
+                                                       id="registerPassword"
+                                                       placeholder="Password"
+                                                       onChange={(e) => {
+                                                           onChangeHandler(e, setRegisterPassword)
+                                                       }}
+                                                       value={registerPassword}/>
+                                                <label htmlFor="registerPassword">Password</label>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            className="btn btn-outline-light btn-lg px-5"
+                                            type="submit"
+                                            onClick={register}>
+                                            Register
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        );
+    } else {
+        return (
+            <section className="vh-100 gradient-custom">
+                <div className="container py-5 h-100">
+                    <div className="row d-flex justify-content-center align-items-center h-100">
+                        <div className="col-12 col-md-8 col-lg-6 col-xl-5">
+                            <div className="card bg-dark text-white">
+                                <div className="card-body p-5">
+                                    <h1>Chat</h1>
+                                    <div className={"overflow-auto"} style={{height: '400px'}}
+                                         ref={messagesContainerRef}>
+                                        {messages.map((message) => (
+
+                                            <div key={message.id} className={"row m-0 p-1"}>
+                                                {(message.user === user.uid) &&
+                                                    <div className={"text-start ms-auto bg-primary rounded"} style={{ display: 'inline-block', maxWidth: '80%' }}>
+                                                        <span
+
+                                                            className={"lead"}>{message.text}</span>
+                                                    </div>
+                                                }
+                                                {(message.user !== user.uid) &&
+                                                    <div className={"text-start me-auto bg-secondary rounded"} style={{ display: 'inline-block', maxWidth: '80%' }}>
+                                                        <span
+
+                                                            className={"lead"}>{message.text}</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className={"row mt-3"}>
+                                        <div className={"col-10 "}>
+                                            <input
+                                                type="text"
+                                                onChange={(e) => {
+                                                    onChangeHandler(e, setMessage)
+                                                }}
+                                                value={message}
+                                                className={"form-control"}
+                                                onKeyPress={(key) => {
+                                                    if (key.charCode === 13) {
+                                                        sendMessage();
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <button className={"col-2 btn btn-outline-light"} onClick={async () => {
+                                            sendMessage()
+                                        }}>
+                                            send
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        )
+    }
 }
 
 export default App;
