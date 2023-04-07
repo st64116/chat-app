@@ -4,9 +4,9 @@ import {initializeApp} from "firebase/app";
 import {getAnalytics} from "firebase/analytics";
 import {getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword} from "firebase/auth";
 import {getFirestore} from "firebase/firestore";
-import {collection, addDoc,doc,setDoc, getDoc} from "firebase/firestore";
+import {collection, addDoc, doc, setDoc, getDoc} from "firebase/firestore";
 import {getDatabase, push, ref, onValue} from "firebase/database";
-import { getStorage, uploadBytes, getDownloadURL, uploadBytesResumable } from "firebase/storage";
+import {getStorage, uploadBytes, getDownloadURL, uploadBytesResumable} from "firebase/storage";
 
 function App() {
 
@@ -72,7 +72,7 @@ function App() {
             });
     }
 
-    const uploadImage = async () =>{
+    const uploadImage = async () => {
         const file = fileInputRef.current.files[0];
         const storageRef = ref(storage, `uploads/${file.name}`);
         const uploadTask = uploadBytesResumable(storageRef, file);
@@ -127,16 +127,19 @@ function App() {
         }
     }
 
-    const sendMessage = () => {
+    const sendMessage = (event) => {
+        event.preventDefault();
         push(ref(database, 'chat/'), {
             user: user.uid,
             text: message,
             timestamp: Date.now(),
+            email: user.email,
+            color: color
         });
         setMessage('');
     }
 
-    const getColor = async () =>{
+    const getColor = async () => {
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
 
@@ -167,11 +170,11 @@ function App() {
         }
     }, [messages])
 
-    useEffect(()=>{
-        if(loggedIn){
+    useEffect(() => {
+        if (loggedIn) {
             getColor();
         }
-    },[loggedIn])
+    }, [loggedIn])
 
     // !! ======= firebase functions =======
 
@@ -179,7 +182,7 @@ function App() {
         set(event.target.value);
     }
 
-    const handleFileType = (event) =>{
+    const handleFileType = (event) => {
         // console.log();
         const file = fileInputRef.current.files[0];
         const allowedTypes = ['image/png', 'image/jpeg'];
@@ -189,6 +192,18 @@ function App() {
             return false;
         }
         return true;
+    }
+
+    const getDate = (timestamp) => {
+        const date = new Date();
+        date.setTime(timestamp);
+        const day = date.getDate();
+        const month = date.getMonth() + 1;
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+
+        const formattedDate = `${day}/${month} ${hours}:${minutes}`;
+        return formattedDate;
     }
 
     // useEffect(()=>{
@@ -301,8 +316,11 @@ function App() {
                                                     <label htmlFor="registerPassword">Surname</label>
                                                 </div>
                                                 <div className="mb-3">
-                                                    <label className={"text-light"} htmlFor={"color"}>choose chat color</label>
-                                                    <input id={"color"} type="color" value={color} onChange={(e)=>{onChangeHandler(e,setColor)}} className={"form-control"}/>
+                                                    <label className={"text-light"} htmlFor={"color"}>choose chat
+                                                        color</label>
+                                                    <input id={"color"} type="color" value={color} onChange={(e) => {
+                                                        onChangeHandler(e, setColor)
+                                                    }} className={"form-control"}/>
                                                 </div>
                                                 {/*<div className="">*/}
                                                 {/*    <label className={"text-light"} htmlFor={"image"}>choose profile picture</label>*/}
@@ -328,11 +346,11 @@ function App() {
     } else {
         return (
             <section className="vh-100 gradient-custom">
-                <div className="container py-5 h-100">
+                <div className="container-fluid py-5 h-100">
                     <div className="row d-flex justify-content-center align-items-center h-100">
-                        <div className="col-12 col-md-8 col-lg-6 col-xl-5">
+                        <div className="col-12 col-md-8 col-lg-6 col-xl-5 p-0">
                             <div className="card bg-dark text-white">
-                                <div className="card-body p-5">
+                                <div className="card-body p-3">
                                     <h1>Chat</h1>
                                     <div className={"overflow-auto"} style={{height: '400px'}}
                                          ref={messagesContainerRef}>
@@ -340,48 +358,51 @@ function App() {
 
                                             <div key={message.id} className={"row m-0 p-1"}>
                                                 {(message.user === user.uid) &&
-                                                    <div className={"text-start ms-auto rounded"} style={{
-                                                        display: 'inline-block',
-                                                        maxWidth: '80%',
-                                                        backgroundColor: color
+                                                    <div className={"ms-auto justify-content-end d-flex flex-column"} style={{
+                                                        maxWidth: '80%'
                                                     }}>
-                                                        <span
+                                                        <span className={"ms-auto"}>{message.email} {getDate(message.timestamp)}</span>
+                                                            <div className={"text-start rounded px-2"} style={{
+                                                            backgroundColor: message.color,
+                                                            }}>
+                                                            <span className={"lead"}>{message.text}</span>
+                                                            </div>
 
-                                                            className={"lead"}>{message.text}</span>
                                                     </div>
                                                 }
                                                 {(message.user !== user.uid) &&
-                                                    <div className={"text-start me-auto bg-secondary rounded"}
-                                                         style={{display: 'inline-block', maxWidth: '80%'}}>
-                                                        <span
-                                                            className={"lead"}>{message.text}</span>
+                                                    <div className={"me-auto justify-content-end d-flex flex-column"} style={{
+                                                        maxWidth: '80%'
+                                                    }}>
+                                                        <span className={"me-auto"}>{message.email} {getDate(message.timestamp)}</span>
+                                                        <div className={"text-start rounded px-2"}  style={{
+                                                            backgroundColor: message.color,
+                                                        }}>
+                                                            <span className={"lead"}>{message.text}</span>
+                                                        </div>
+
                                                     </div>
                                                 }
                                             </div>
                                         ))}
                                     </div>
-                                    <div className={"row mt-3"}>
-                                        <div className={"col-10 "}>
-                                            <input
-                                                type="text"
-                                                onChange={(e) => {
-                                                    onChangeHandler(e, setMessage)
-                                                }}
-                                                value={message}
-                                                className={"form-control"}
-                                                onKeyPress={(key) => {
-                                                    if (key.charCode === 13) {
-                                                        sendMessage();
-                                                    }
-                                                }}
-                                            />
+                                    <form onSubmit={sendMessage}>
+                                        <div className={"row mt-3"}>
+                                            <div className={"col-9 "}>
+                                                <input
+                                                    type="text"
+                                                    onChange={(e) => {
+                                                        onChangeHandler(e, setMessage)
+                                                    }}
+                                                    value={message}
+                                                    className={"form-control"}
+                                                />
+                                            </div>
+                                            <button className={"col-3 btn btn-outline-light"} type={"submit"}>
+                                                send
+                                            </button>
                                         </div>
-                                        <button className={"col-2 btn btn-outline-light"} onClick={async () => {
-                                            sendMessage()
-                                        }}>
-                                            send
-                                        </button>
-                                    </div>
+                                    </form>
                                 </div>
                             </div>
                         </div>
