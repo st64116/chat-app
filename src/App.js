@@ -4,9 +4,9 @@ import {initializeApp} from "firebase/app";
 import {getAnalytics} from "firebase/analytics";
 import {getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword} from "firebase/auth";
 import {getFirestore} from "firebase/firestore";
-import {collection, addDoc} from "firebase/firestore";
+import {collection, addDoc,doc,setDoc, getDoc} from "firebase/firestore";
 import {getDatabase, push, ref, onValue} from "firebase/database";
-
+import { getStorage, uploadBytes, getDownloadURL, uploadBytesResumable } from "firebase/storage";
 
 function App() {
 
@@ -19,6 +19,11 @@ function App() {
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
     const messagesContainerRef = useRef(null);
+    const [name, setName] = useState('');
+    const [surname, setSurname] = useState('');
+    const [color, setColor] = useState('#2345fd');
+    const [error, setError] = useState(null);
+    const fileInputRef = useRef(null);
 
     const firebaseConfig = {
         apiKey: "AIzaSyDur5UEXIl3r3CgavwvjglIbcXf_yWh2ys",
@@ -44,12 +49,16 @@ function App() {
     // Initialize Realtime Database and get a reference to the service
     const database = getDatabase(app);
 
+    // Initialize Cloud Storage and get a reference to the service
+    const storage = getStorage(app);
+
     const chatRef = ref(database, 'chat/');
 
 
     // ======= firebase functions =======
 
-    const login = () => {
+    const login = (event) => {
+        event.preventDefault();
         signInWithEmailAndPassword(auth, loginEmail, loginPassword)
             .then((userCredential) => {
                 // Signed in
@@ -59,11 +68,38 @@ function App() {
             .catch((error) => {
                 const errorCode = error.code;
                 const errorMessage = error.message;
-                console.log(errorCode, errorMessage);
+                setError(errorMessage);
             });
     }
 
-    const register = () => {
+    const uploadImage = async () =>{
+        const file = fileInputRef.current.files[0];
+        const storageRef = ref(storage, `uploads/${file.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                // handle upload progress here
+            },
+            (error) => {
+                // handle error here
+            },
+            () => {
+                // handle successful upload here
+                console.log('File uploaded successfully!');
+            }
+        );
+    }
+
+    const register = async (event) => {
+        event.preventDefault();
+
+        // if(!handleFileType()){
+        //     return;
+        // }else{
+        //     await uploadImage();
+        // }
+
         createUserWithEmailAndPassword(auth, registerEmail, registerPassword)
             .then(async (userCredential) => {
                 // Signed in
@@ -74,18 +110,18 @@ function App() {
             .catch((error) => {
                 const errorCode = error.code;
                 const errorMessage = error.message;
-                console.log(errorCode, errorMessage);
+                setError(errorMessage);
             });
     }
 
     const addUserDocument = async (uid) => {
         try {
-            const docRef = await addDoc(collection(db, "users"), {
-                first: "Ada",
-                last: "Lovelace",
-                born: 1815
+            const userRef = doc(db, 'users', uid);
+            await setDoc(userRef, {
+                name: name,
+                surname: surname,
+                color: color
             });
-            console.log("Document written with ID: ", docRef.id);
         } catch (e) {
             console.error("Error adding document: ", e);
         }
@@ -98,6 +134,15 @@ function App() {
             timestamp: Date.now(),
         });
         setMessage('');
+    }
+
+    const getColor = async () =>{
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            setColor(docSnap.data().color);
+        }
     }
 
     useEffect(() => {
@@ -122,11 +167,28 @@ function App() {
         }
     }, [messages])
 
-    // !! ======= firebase functions =======
+    useEffect(()=>{
+        if(loggedIn){
+            getColor();
+        }
+    },[loggedIn])
 
+    // !! ======= firebase functions =======
 
     const onChangeHandler = (event, set) => {
         set(event.target.value);
+    }
+
+    const handleFileType = (event) =>{
+        // console.log();
+        const file = fileInputRef.current.files[0];
+        const allowedTypes = ['image/png', 'image/jpeg'];
+
+        if (!allowedTypes.includes(file.type)) {
+            setError("wrong file type")
+            return false;
+        }
+        return true;
     }
 
     // useEffect(()=>{
@@ -147,78 +209,115 @@ function App() {
                             <div className="card bg-dark text-white">
                                 <div className="card-body p-5 text-center">
 
-                                    <div className="">
+                                    <form onSubmit={login}>
+                                        <div className="">
+                                            <h2 className="fw-bold mb-2 text-uppercase mb-3">Login</h2>
+                                            <div className="form-outline form-white mb-4 text-dark">
+                                                <div className="form-floating mb-3">
+                                                    <input type="email"
+                                                           className="form-control"
+                                                           id="floatingInput"
+                                                           placeholder="name@example.com"
+                                                           onChange={(e) => {
+                                                               onChangeHandler(e, setLoginEmail)
+                                                           }}
+                                                           value={loginEmail}/>
+                                                    <label htmlFor="floatingInput">Email address</label>
+                                                </div>
+                                                <div className="form-floating">
+                                                    <input type="password"
+                                                           className="form-control"
+                                                           id="floatingPassword"
+                                                           placeholder="Password"
+                                                           onChange={(e) => {
+                                                               onChangeHandler(e, setLoginPassword)
+                                                           }}
+                                                           value={loginPassword}/>
+                                                    <label htmlFor="floatingPassword">Password</label>
+                                                </div>
+                                            </div>
 
-                                        <h2 className="fw-bold mb-2 text-uppercase mb-3">Login</h2>
-                                        <div className="form-outline form-white mb-4 text-dark">
-                                            <div className="form-floating mb-3">
-                                                <input type="email"
-                                                       className="form-control"
-                                                       id="floatingInput"
-                                                       placeholder="name@example.com"
-                                                       onChange={(e) => {
-                                                           onChangeHandler(e, setLoginEmail)
-                                                       }}
-                                                       value={loginEmail}/>
-                                                <label htmlFor="floatingInput">Email address</label>
-                                            </div>
-                                            <div className="form-floating">
-                                                <input type="password"
-                                                       className="form-control"
-                                                       id="floatingPassword"
-                                                       placeholder="Password"
-                                                       onChange={(e) => {
-                                                           onChangeHandler(e, setLoginPassword)
-                                                       }}
-                                                       value={loginPassword}/>
-                                                <label htmlFor="floatingPassword">Password</label>
-                                            </div>
+                                            <button
+                                                className="btn btn-outline-light btn-lg px-5"
+                                                type="submit"
+                                                onClick={login}>
+                                                Login
+                                            </button>
                                         </div>
-
-                                        <button
-                                            className="btn btn-outline-light btn-lg px-5"
-                                            type="submit"
-                                            onClick={login}>
-                                            Login
-                                        </button>
-                                    </div>
+                                    </form>
                                     <hr/>
-                                    <div className="mb-md-5 mt-md-4 pb-5">
+                                    <div className="mb-4">
+                                        <form onSubmit={register}>
+                                            <h2 className="fw-bold mb-2 text-uppercase mb-3">Register</h2>
 
-                                        <h2 className="fw-bold mb-2 text-uppercase mb-3">Register</h2>
-
-                                        <div className="form-outline form-white mb-4 text-dark">
-                                            <div className="form-floating mb-3">
-                                                <input type="email"
-                                                       className="form-control"
-                                                       id="registerEmail"
-                                                       placeholder="name@example.com"
-                                                       onChange={(e) => {
-                                                           onChangeHandler(e, setregisterEmail)
-                                                       }}
-                                                       value={registerEmail}/>
-                                                <label htmlFor="registerEmail">Email address</label>
+                                            <div className="form-outline form-white mb-4 text-dark">
+                                                <div className="form-floating mb-3">
+                                                    <input type="email"
+                                                           required
+                                                           className="form-control"
+                                                           id="registerEmail"
+                                                           placeholder="name@example.com"
+                                                           onChange={(e) => {
+                                                               onChangeHandler(e, setregisterEmail)
+                                                           }}
+                                                           value={registerEmail}/>
+                                                    <label htmlFor="registerEmail">Email address</label>
+                                                </div>
+                                                <div className="form-floating mb-3">
+                                                    <input type="password"
+                                                           required
+                                                           minLength={6}
+                                                           className="form-control"
+                                                           id="registerPassword"
+                                                           placeholder="Password"
+                                                           onChange={(e) => {
+                                                               onChangeHandler(e, setRegisterPassword)
+                                                           }}
+                                                           value={registerPassword}/>
+                                                    <label htmlFor="registerPassword">Password</label>
+                                                </div>
+                                                <div className="form-floating mb-3">
+                                                    <input type="text"
+                                                           required
+                                                           className="form-control"
+                                                           id="name"
+                                                           placeholder="Name"
+                                                           onChange={(e) => {
+                                                               onChangeHandler(e, setName)
+                                                           }}
+                                                           value={name}/>
+                                                    <label htmlFor="registerPassword">Name</label>
+                                                </div>
+                                                <div className="form-floating mb-3">
+                                                    <input type="text"
+                                                           required
+                                                           className="form-control"
+                                                           id="surname"
+                                                           placeholder="Surname"
+                                                           onChange={(e) => {
+                                                               onChangeHandler(e, setSurname)
+                                                           }}
+                                                           value={surname}/>
+                                                    <label htmlFor="registerPassword">Surname</label>
+                                                </div>
+                                                <div className="mb-3">
+                                                    <label className={"text-light"} htmlFor={"color"}>choose chat color</label>
+                                                    <input id={"color"} type="color" value={color} onChange={(e)=>{onChangeHandler(e,setColor)}} className={"form-control"}/>
+                                                </div>
+                                                {/*<div className="">*/}
+                                                {/*    <label className={"text-light"} htmlFor={"image"}>choose profile picture</label>*/}
+                                                {/*    <input onChange={handleFileType} ref={fileInputRef} id={"image"} required type="file" accept="image/png, image/jpeg" className={"form-control"}/>*/}
+                                                {/*</div>*/}
                                             </div>
-                                            <div className="form-floating">
-                                                <input type="password"
-                                                       className="form-control"
-                                                       id="registerPassword"
-                                                       placeholder="Password"
-                                                       onChange={(e) => {
-                                                           onChangeHandler(e, setRegisterPassword)
-                                                       }}
-                                                       value={registerPassword}/>
-                                                <label htmlFor="registerPassword">Password</label>
-                                            </div>
-                                        </div>
 
-                                        <button
-                                            className="btn btn-outline-light btn-lg px-5"
-                                            type="submit"
-                                            onClick={register}>
-                                            Register
-                                        </button>
+                                            <button
+                                                className="btn btn-outline-light btn-lg px-5"
+                                                type="submit">
+                                                Register
+                                            </button>
+                                        </form>
                                     </div>
+                                    <span className={"text-danger"}>{error}</span>
                                 </div>
                             </div>
                         </div>
@@ -241,16 +340,20 @@ function App() {
 
                                             <div key={message.id} className={"row m-0 p-1"}>
                                                 {(message.user === user.uid) &&
-                                                    <div className={"text-start ms-auto bg-primary rounded"} style={{ display: 'inline-block', maxWidth: '80%' }}>
+                                                    <div className={"text-start ms-auto rounded"} style={{
+                                                        display: 'inline-block',
+                                                        maxWidth: '80%',
+                                                        backgroundColor: color
+                                                    }}>
                                                         <span
 
                                                             className={"lead"}>{message.text}</span>
                                                     </div>
                                                 }
                                                 {(message.user !== user.uid) &&
-                                                    <div className={"text-start me-auto bg-secondary rounded"} style={{ display: 'inline-block', maxWidth: '80%' }}>
+                                                    <div className={"text-start me-auto bg-secondary rounded"}
+                                                         style={{display: 'inline-block', maxWidth: '80%'}}>
                                                         <span
-
                                                             className={"lead"}>{message.text}</span>
                                                     </div>
                                                 }
